@@ -15,10 +15,10 @@ import (
 // JWTAuthService represents any object that is able to generate new JWT tokens and also validate them.
 type JWTAuthService interface {
 	// GenerateToken should generate a new JWT token with the given claims and return the encoded JWT token.
-	GenerateToken(jwt.Claims, context.Context) (string, errorx.Error)
+	GenerateToken(context.Context, jwt.Claims) (string, errorx.Error)
 
 	// VerifyToken should parse and verify the token string and return the resulting JWT token for further validation.
-	VerifyToken(string, context.Context) (*jwt.Token, errorx.Error)
+	VerifyToken(context.Context, string) (*jwt.Token, errorx.Error)
 }
 
 // JWTAuthHMACService creates and validates JWT tokens that are signed with an HMAC256-hashed secret.
