@@ -10,7 +10,6 @@ import (
 	"errors"
 
 	"go.innotegrity.dev/errorx"
-	"go.innotegrity.dev/slogx"
 )
 
 // ParsePublicKeyFromCertificate parses the RSA public key portion from an X509 certificate.
@@ -18,23 +17,17 @@ import (
 // The following errors are returned by this function:
 // InvalidPublicKeyError
 func ParsePublicKeyFromCertificate(ctx context.Context, cert *x509.Certificate) (*rsa.PublicKey, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// validate parameters
 	if cert == nil {
-		e := NewInvalidPublicKeyError("failed to parse public key", errors.New("no certificate was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewInvalidPublicKeyErrorWithContext(ctx, "failed to parse public key",
+			errors.New("no certificate was provided"))
 	}
 
 	// extract the RSA public key from the certificate
 	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		e := NewInvalidPublicKeyError("failed to parse public key",
+		return nil, NewInvalidPublicKeyErrorWithContext(ctx, "failed to parse public key",
 			errors.New("public key does not appear to be in RSA format"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
 	}
 	return publicKey, nil
 }
@@ -49,19 +42,14 @@ func ParsePublicKeyFromCertificate(ctx context.Context, cert *x509.Certificate) 
 // The following errors are returned by this function:
 // InvalidPublicKeyError
 func Sign(ctx context.Context, contents []byte, privateKey *rsa.PrivateKey) ([]byte, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// validate parameters
 	if contents == nil {
-		e := NewInvalidPublicKeyError("failed to sign contents", errors.New("no content was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewInvalidPublicKeyErrorWithContext(ctx, "failed to sign contents",
+			errors.New("no content was provided"))
 	}
 	if privateKey == nil {
-		e := NewInvalidPublicKeyError("failed to sign contents", errors.New("no private key was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewInvalidPublicKeyErrorWithContext(ctx, "failed to sign contents",
+			errors.New("no private key was provided"))
 	}
 
 	// hash the contents so we can sign that
@@ -72,9 +60,7 @@ func Sign(ctx context.Context, contents []byte, privateKey *rsa.PrivateKey) ([]b
 	// use PSS to sign the contents as it is newer and supposedly better than PKCSv1.5
 	signature, err := rsa.SignPSS(rand.Reader, privateKey, crypto.SHA256, hashSum, nil)
 	if err != nil {
-		e := NewInvalidPublicKeyError("failed to sign contents", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewInvalidPublicKeyErrorWithContext(ctx, "failed to sign contents", err)
 	}
 	return signature, nil
 }
@@ -88,24 +74,15 @@ func Sign(ctx context.Context, contents []byte, privateKey *rsa.PrivateKey) ([]b
 // The following errors are returned by this function:
 // SignatureError
 func Verify(ctx context.Context, contents, signature []byte, publicKey *rsa.PublicKey) errorx.Error {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// validate parameters
 	if contents == nil {
-		e := NewSignatureError("failed to verify signature", errors.New("no content was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewSignatureErrorWithContext(ctx, "failed to verify signature", errors.New("no content was provided"))
 	}
 	if signature == nil {
-		e := NewSignatureError("failed to verify signature", errors.New("no signature was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewSignatureErrorWithContext(ctx, "failed to verify signature", errors.New("no signature was provided"))
 	}
 	if publicKey == nil {
-		e := NewSignatureError("failed to verify signature", errors.New("no public key was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewSignatureErrorWithContext(ctx, "failed to verify signature", errors.New("no public key was provided"))
 	}
 
 	// hash the contents so we can verify that
@@ -115,9 +92,7 @@ func Verify(ctx context.Context, contents, signature []byte, publicKey *rsa.Publ
 
 	// verify the signature
 	if err := rsa.VerifyPSS(publicKey, crypto.SHA256, hashSum, signature, nil); err != nil {
-		e := NewSignatureError("failed to verify signature", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewSignatureErrorWithContext(ctx, "failed to verify signature", err)
 	}
 	return nil
 }

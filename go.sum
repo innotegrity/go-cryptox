@@ -20,12 +20,8 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-go.innotegrity.dev/errorx v1.1.0 h1:wuLToJBpMpBLac+ANzTCKKJv1rN3ZVKXv++fskUoH3Q=
-go.innotegrity.dev/errorx v1.1.0/go.mod h1:l/oAHO6/qFPyggqB9k4w/5xcdP9GKxOUTAW22duSyMw=
-go.innotegrity.dev/generic v0.1.1 h1:RHEA1Z1ZjCRfzdxxvTPdX2y+BKjGlHT4x6NreR/L+U4=
-go.innotegrity.dev/generic v0.1.1/go.mod h1:SS2En0XONi0Mv0xKmXH/f2IwvQAl6g0Jw+rfeFhd1kM=
-go.innotegrity.dev/slogx v0.6.0 h1:5xrCgqGWxNYUOhL6v57aXIbrPkbpCl+kXq2YiZi03yI=
-go.innotegrity.dev/slogx v0.6.0/go.mod h1:aPAFcnef2ezkonKxLDLjcZH85UVb4h75OwpH8YNogAQ=
+go.innotegrity.dev/errorx v1.1.3 h1:T8ArojvnVsYJSPHrHWxRis39ugw2y7mRfZ/kTNHRbVE=
+go.innotegrity.dev/errorx v1.1.3/go.mod h1:l/oAHO6/qFPyggqB9k4w/5xcdP9GKxOUTAW22duSyMw=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/crypto v0.3.1-0.20221117191849-2c476679df9a/go.mod h1:hebNnKkNXi2UzZN1eVRvBB7co0a+JxK6XbPiWVs/3J4=

@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	pmailcrypto "github.com/ProtonMail/gopenpgp/v2/crypto"
-	"go.innotegrity.dev/slogx"
 )
 
 // PGPKeyPair represents a PGP key pair.
@@ -22,22 +21,18 @@ type PGPKeyPair struct {
 // The following errors are returned by this function:
 // PGPError
 func NewPGPKeyPair(ctx context.Context, name, email, keyType string, bits int) (*PGPKeyPair, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
 	kp := &PGPKeyPair{}
 
 	// generate a new key
 	key, err := pmailcrypto.GenerateKey(name, email, keyType, bits)
 	if err != nil {
-		e := NewPGPError("failed to generate PGP key", err)
-		e.WithAttrs(map[string]any{
-			"name":     name,
-			"email":    email,
-			"key_type": keyType,
-			"bits":     bits,
-		})
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to generate PGP key", err).
+			WithAttrs(map[string]any{
+				"name":     name,
+				"email":    email,
+				"key_type": keyType,
+				"bits":     bits,
+			})
 	}
 	kp.privateKey = key
 
@@ -45,27 +40,23 @@ func NewPGPKeyPair(ctx context.Context, name, email, keyType string, bits int) (
 	kp.passphrase = GeneratePassword(32, 5, 5, 5)
 	locked, err := key.Lock([]byte(kp.passphrase))
 	if err != nil {
-		e := NewPGPError("failed to generate password for PGP key", err)
-		e.WithAttrs(map[string]any{
-			"name":     name,
-			"email":    email,
-			"key_type": keyType,
-			"bits":     bits,
-		})
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to generate password for PGP key", err).
+			WithAttrs(map[string]any{
+				"name":     name,
+				"email":    email,
+				"key_type": keyType,
+				"bits":     bits,
+			})
 	}
 	armoredKey, err := locked.Armor()
 	if err != nil {
-		e := NewPGPError("failed to armor PGP key", err)
-		e.WithAttrs(map[string]any{
-			"name":     name,
-			"email":    email,
-			"key_type": keyType,
-			"bits":     bits,
-		})
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to armor PGP key", err).
+			WithAttrs(map[string]any{
+				"name":     name,
+				"email":    email,
+				"key_type": keyType,
+				"bits":     bits,
+			})
 	}
 	kp.armoredKey = armoredKey
 	return kp, nil
@@ -78,8 +69,6 @@ func NewPGPKeyPair(ctx context.Context, name, email, keyType string, bits int) (
 // The following errors are returned by this function:
 // PGPError
 func NewPGPKeyPairFromArmor(ctx context.Context, armoredKey, passphrase string) (*PGPKeyPair, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
 	kp := &PGPKeyPair{
 		armoredKey: armoredKey,
 		passphrase: passphrase,
@@ -88,17 +77,13 @@ func NewPGPKeyPairFromArmor(ctx context.Context, armoredKey, passphrase string) 
 	// load the key
 	key, err := pmailcrypto.NewKeyFromArmored(kp.armoredKey)
 	if err != nil {
-		e := NewPGPError("failed to load armored key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to load armored key", err)
 	}
 
 	// check to see if the key is locked
 	locked, err := key.IsLocked()
 	if err != nil {
-		e := NewPGPError("failed to determine if key is locked", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to determine if key is locked", err)
 	}
 	if !locked {
 		kp.privateKey = key
@@ -108,9 +93,7 @@ func NewPGPKeyPairFromArmor(ctx context.Context, armoredKey, passphrase string) 
 	// unlock the key
 	unlocked, err := key.Unlock([]byte(kp.passphrase))
 	if err != nil {
-		e := NewPGPError("failed to unlock key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPGPErrorWithContext(ctx, "failed to unlock key", err)
 	}
 	kp.privateKey = unlocked
 	return kp, nil
@@ -128,13 +111,9 @@ func (kp *PGPKeyPair) ClearPrivateParams() {
 // The following errors are returned by this function:
 // PGPError
 func (kp *PGPKeyPair) GetArmoredPrivateKey(ctx context.Context) (string, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if kp.armoredKey == "" {
-		e := NewPGPError("failed to load armored private key", errors.New("private key has not been initialized"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewPGPErrorWithContext(ctx, "failed to load armored private key",
+			errors.New("private key has not been initialized"))
 	}
 	return kp.armoredKey, nil
 }
@@ -144,19 +123,13 @@ func (kp *PGPKeyPair) GetArmoredPrivateKey(ctx context.Context) (string, error) 
 // The following errors are returned by this function:
 // ErrGetPGPKeyFailure
 func (kp *PGPKeyPair) GetArmoredPublicKey(ctx context.Context) (string, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if kp.privateKey == nil { // should never happen
-		e := NewPGPError("failed to load armored public key", errors.New("private key has not been initialized"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewPGPErrorWithContext(ctx, "failed to load armored public key",
+			errors.New("private key has not been initialized"))
 	}
 	key, err := kp.privateKey.GetArmoredPublicKey()
 	if err != nil {
-		e := NewPGPError("failed to load armored public key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewPGPErrorWithContext(ctx, "failed to load armored public key", err)
 	}
 	return key, nil
 }

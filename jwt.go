@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"go.innotegrity.dev/errorx"
-	"go.innotegrity.dev/slogx"
 )
 
 // JWTAuthService represents any object that is able to generate new JWT tokens and also validate them.
@@ -36,15 +35,10 @@ func NewJWTAuthHMACService(secret []byte) *JWTAuthHMACService {
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthHMACService) GenerateToken(ctx context.Context, claims jwt.Claims) (string, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString(j.secret)
 	if err != nil {
-		e := NewJWTError("failed to create new JWT with claims", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewJWTErrorWithContext(ctx, "failed to create new JWT with claims", err)
 	}
 	return signedToken, nil
 }
@@ -56,25 +50,19 @@ func (j *JWTAuthHMACService) GenerateToken(ctx context.Context, claims jwt.Claim
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthHMACService) VerifyToken(ctx context.Context, encodedToken string) (*jwt.Token, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// parse the JWT token
 	token, err := jwt.Parse(encodedToken, func(token *jwt.Token) (interface{}, error) {
 		method, ok := token.Method.(*jwt.SigningMethodHMAC)
 		if !ok || strings.ToUpper(method.Alg()) != "HS256" {
-			e := NewJWTError("failed to validate JWT algorithm",
-				fmt.Errorf("JWT algorithm '%s' does not match expected 'HS256' algorithm", token.Header["alg"]))
-			e.WithAttr("jwt_alg", token.Header["alg"])
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return "", e
+			e := NewJWTErrorWithContext(ctx, "failed to validate JWT algorithm",
+				fmt.Errorf("JWT algorithm '%s' does not match expected 'HS256' algorithm", token.Header["alg"])).
+				WithAttr("jwt_alg", token.Header["alg"])
+			return nil, e
 		}
 		return j.secret, nil
 	})
 	if err != nil {
-		e := NewJWTError("failed to parse JWT", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewJWTErrorWithContext(ctx, "failed to parse JWT", err)
 	}
 	return token, nil
 }
@@ -99,15 +87,10 @@ func NewJWTAuthRSAService(publicKey *rsa.PublicKey, privateKey *rsa.PrivateKey) 
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthRSAService) GenerateToken(ctx context.Context, claims jwt.Claims) (string, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signedToken, err := token.SignedString(j.privateKey)
 	if err != nil {
-		e := NewJWTError("failed to generate JWT", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewJWTErrorWithContext(ctx, "failed to generate JWT", err)
 	}
 	return signedToken, nil
 }
@@ -119,25 +102,18 @@ func (j *JWTAuthRSAService) GenerateToken(ctx context.Context, claims jwt.Claims
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthRSAService) VerifyToken(ctx context.Context, encodedToken string) (*jwt.Token, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// parse the JWT token
 	token, err := jwt.Parse(encodedToken, func(token *jwt.Token) (interface{}, error) {
 		method, ok := token.Method.(*jwt.SigningMethodRSA)
 		if !ok || strings.ToUpper(method.Alg()) != "RS256" {
-			e := NewJWTError("failed to validate JWT algorithm",
-				fmt.Errorf("JWT algorithm '%s' does not match expected 'RS256' algorithm", token.Header["alg"]))
-			e.WithAttr("jwt_alg", token.Header["alg"])
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return "", e
+			return nil, NewJWTErrorWithContext(ctx, "failed to validate JWT algorithm",
+				fmt.Errorf("JWT algorithm '%s' does not match expected 'RS256' algorithm", token.Header["alg"])).
+				WithAttr("jwt_alg", token.Header["alg"])
 		}
 		return j.publicKey, nil
 	})
 	if err != nil {
-		e := NewJWTError("failed to parse JWT", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewJWTErrorWithContext(ctx, "failed to parse JWT", err)
 	}
 	return token, nil
 }
@@ -162,15 +138,10 @@ func NewJWTAuthECDSAService(publicKey *ecdsa.PublicKey, privateKey *ecdsa.Privat
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthECDSAService) GenerateToken(ctx context.Context, claims jwt.Claims) (string, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 	signedToken, err := token.SignedString(j.privateKey)
 	if err != nil {
-		e := NewJWTError("failed to generate JWT", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return "", e
+		return "", NewJWTErrorWithContext(ctx, "failed to generate JWT", err)
 	}
 	return signedToken, nil
 }
@@ -182,25 +153,18 @@ func (j *JWTAuthECDSAService) GenerateToken(ctx context.Context, claims jwt.Clai
 // The following errors are returned by this function:
 // JWTError
 func (j *JWTAuthECDSAService) VerifyToken(ctx context.Context, encodedToken string) (*jwt.Token, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// parse the JWT token
 	token, err := jwt.Parse(encodedToken, func(token *jwt.Token) (interface{}, error) {
 		method, ok := token.Method.(*jwt.SigningMethodECDSA)
 		if !ok || strings.ToUpper(method.Alg()) != "ES256" {
-			e := NewJWTError("failed to validate JWT algorithm",
-				fmt.Errorf("JWT algorithm '%s' does not match expected 'ES256' algorithm", token.Header["alg"]))
-			e.WithAttr("jwt_alg", token.Header["alg"])
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return "", e
+			return nil, NewJWTErrorWithContext(ctx, "failed to validate JWT algorithm",
+				fmt.Errorf("JWT algorithm '%s' does not match expected 'ES256' algorithm", token.Header["alg"])).
+				WithAttr("jwt_alg", token.Header["alg"])
 		}
 		return j.publicKey, nil
 	})
 	if err != nil {
-		e := NewJWTError("failed to parse JWT", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewJWTErrorWithContext(ctx, "failed to parse JWT", err)
 	}
 	return token, nil
 }

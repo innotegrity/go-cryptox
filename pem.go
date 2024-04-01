@@ -15,8 +15,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"go.innotegrity.dev/slogx"
 )
 
 // PEMCipher is just an alias for int.
@@ -72,24 +70,16 @@ var rfc1423Algos = []rfc1423Algo{{
 // The following errors are returned by this function:
 // PEMGeneralError
 func DecodePEMBlockFromFile(ctx context.Context, file string) (*pem.Block, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	contents, err := os.ReadFile(file)
 	if err != nil {
-		e := NewPEMGeneralError(fmt.Sprintf("failed to read PEM encoded file '%s'", file), err)
-		e.WithAttr("file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPEMGeneralErrorWithContext(ctx, fmt.Sprintf("failed to read PEM encoded file '%s'", file), err).
+			WithAttr("file", file)
 	}
 
 	block, _ := pem.Decode(contents)
 	if block == nil {
-		e := NewPEMGeneralError(fmt.Sprintf("failed to decode PEM data from file '%s'", file),
-			errors.New("no PEM data was found"))
-		e.WithAttr("file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewPEMGeneralErrorWithContext(ctx, fmt.Sprintf("failed to decode PEM data from file '%s'", file),
+			errors.New("no PEM data was found")).WithAttr("file", file)
 	}
 	return block, nil
 }
@@ -105,62 +95,46 @@ func DecodePEMBlockFromFile(ctx context.Context, file string) (*pem.Block, error
 // The following errors are returned by this function:
 // DecryptionError
 func DecryptPEMBlock(ctx context.Context, b *pem.Block, password []byte) ([]byte, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if b == nil {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("PEM block is nil"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", errors.New("PEM block is nil"))
 	}
 
 	dek, ok := b.Headers["DEK-Info"]
 	if !ok {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("no DEK-Info header in block"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block",
+			errors.New("no DEK-Info header in block"))
 	}
 
 	idx := strings.Index(dek, ",")
 	if idx == -1 {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("mailformed DEK-Info header"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block",
+			errors.New("mailformed DEK-Info header"))
 	}
 
 	mode, hexIV := dek[:idx], dek[idx+1:]
 	ciph := cipherByName(mode)
 	if ciph == nil {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("unknown encryption mode"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block",
+			errors.New("unknown encryption mode"))
 	}
 	iv, err := hex.DecodeString(hexIV)
 	if err != nil {
-		e := NewDecryptionError("failed to decrypt PEM block", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", err)
 	}
 	if len(iv) != ciph.blockSize {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("incorrect IV size"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", errors.New("incorrect IV size"))
 	}
 
 	// based on the OpenSSL implementation - the salt is the first 8 bytes of the initialization vector
 	key := ciph.deriveKey(password, iv[:8])
 	block, err := ciph.cipherFunc(key)
 	if err != nil {
-		e := NewDecryptionError("failed to decrypt PEM block", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", err)
 	}
 
 	if len(b.Bytes)%block.BlockSize() != 0 {
-		e := NewDecryptionError("failed to decrypt PEM block",
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block",
 			errors.New("encrypted PEM data is not a multiple of the block size"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
 	}
 
 	data := make([]byte, len(b.Bytes))
@@ -175,26 +149,19 @@ func DecryptPEMBlock(ctx context.Context, b *pem.Block, password []byte) ([]byte
 	// If we detect a bad padding, we assume it is an invalid password.
 	dlen := len(data)
 	if dlen == 0 || dlen%ciph.blockSize != 0 {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("invalid padding"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", errors.New("invalid padding"))
 	}
 	last := int(data[dlen-1])
 	if dlen < last {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("password is incorrect"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", errors.New("password is incorrect"))
 	}
 	if last == 0 || last > ciph.blockSize {
-		e := NewDecryptionError("failed to decrypt PEM block", errors.New("password is incorrect"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block", errors.New("password is incorrect"))
 	}
 	for _, val := range data[dlen-last:] {
 		if int(val) != last {
-			e := NewDecryptionError("failed to decrypt PEM block", errors.New("password is incorrect"))
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return nil, e
+			return nil, NewDecryptionErrorWithContext(ctx, "failed to decrypt PEM block",
+				errors.New("password is incorrect"))
 		}
 	}
 	return data[:dlen-last], nil
@@ -208,29 +175,21 @@ func DecryptPEMBlock(ctx context.Context, b *pem.Block, password []byte) ([]byte
 func EncryptPEMBlock(ctx context.Context, rand io.Reader, blockType string, data, password []byte, alg PEMCipher) (
 	*pem.Block, error) {
 
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	ciph := cipherByKey(alg)
 	if ciph == nil {
-		e := NewEncryptionError("failed to encrypt PEM block", errors.New("unknown encryption mode"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewEncryptionErrorWithContext(ctx, "failed to encrypt PEM block",
+			errors.New("unknown encryption mode"))
 	}
 	iv := make([]byte, ciph.blockSize)
 	if _, err := io.ReadFull(rand, iv); err != nil {
-		e := NewEncryptionError("failed to encrypt PEM block", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewEncryptionErrorWithContext(ctx, "failed to encrypt PEM block", err)
 	}
 
 	// the salt is the first 8 bytes of the initialization vector, matching the key derivation in DecryptPEMBlock.
 	key := ciph.deriveKey(password, iv[:8])
 	block, err := ciph.cipherFunc(key)
 	if err != nil {
-		e := NewEncryptionError("failed to encrypt PEM block", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewEncryptionErrorWithContext(ctx, "failed to encrypt PEM block", err)
 	}
 	enc := cipher.NewCBCEncrypter(block, iv)
 	pad := ciph.blockSize - len(data)%ciph.blockSize
@@ -269,27 +228,20 @@ func IsEncryptedPEMBlock(b *pem.Block) bool {
 // The following errors are returned by this function:
 // X509CertificateError
 func ParsePEMCertificateBytes(ctx context.Context, contents []byte) ([]*x509.Certificate, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if contents == nil {
-		e := NewX509CertificateError("failed to parse PEM certificate", errors.New("no content was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewX509CertificateErrorWithContext(ctx, "failed to parse PEM certificate",
+			errors.New("no content was provided"))
 	}
 
 	block, _ := pem.Decode(contents)
 	if block == nil {
-		e := NewX509CertificateError("failed to parse PEM certificate", errors.New("no PEM data was decoded"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewX509CertificateErrorWithContext(ctx, "failed to parse PEM certificate",
+			errors.New("no PEM data was decoded"))
 	}
 
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
-		e := NewX509CertificateError("failed to parse PEM certificate", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewX509CertificateErrorWithContext(ctx, "failed to parse PEM certificate", err)
 	}
 	return certs, nil
 }
@@ -299,15 +251,11 @@ func ParsePEMCertificateBytes(ctx context.Context, contents []byte) ([]*x509.Cer
 // The following errors are returned by this function:
 // X509CertificateError
 func ParsePEMCertificateFile(ctx context.Context, file string) ([]*x509.Certificate, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	contents, err := os.ReadFile(file)
 	if err != nil {
-		e := NewX509CertificateError(fmt.Sprintf("failed to parse PEM certificate file '%s'", file), err)
-		e.WithAttr("file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewX509CertificateErrorWithContext(ctx,
+			fmt.Sprintf("failed to parse PEM certificate file '%s'", file), err).
+			WithAttr("file", file)
 	}
 	return ParsePEMCertificateBytes(ctx, contents)
 }
@@ -320,44 +268,33 @@ func ParsePEMCertificateFile(ctx context.Context, file string) ([]*x509.Certific
 // The following errors are returned by this function:
 // RSAPrivateKeyError
 func ParsePEMPrivateKeyBytes(ctx context.Context, contents []byte, password []byte) (*rsa.PrivateKey, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if contents == nil {
-		e := NewRSAPrivateKeyError("failed to parse RSA private Key", errors.New("no content was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewRSAPrivateKeyErrorWithContext(ctx,
+			"failed to parse RSA private Key", errors.New("no content was provided"))
 	}
 
 	block, _ := pem.Decode(contents)
 	if block == nil {
-		e := NewRSAPrivateKeyError("failed to parse RSA private Key", errors.New("no PEM data was decoded"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to parse RSA private Key",
+			errors.New("no PEM data was decoded"))
 	}
 
 	var err error
 	decryptedBlock := block.Bytes
 	if IsEncryptedPEMBlock(block) {
 		if password == nil {
-			e := NewRSAPrivateKeyError("failed to parse RSA private Key",
+			return nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to parse RSA private Key",
 				errors.New("private key is encrypted but no password was supplied"))
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return nil, e
 		}
 		decryptedBlock, err = DecryptPEMBlock(ctx, block, password)
 		if err != nil {
-			e := NewRSAPrivateKeyError("failed to parse RSA private Key", err)
-			logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-			return nil, e
+			return nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to parse RSA private Key", err)
 		}
 	}
 
 	key, err := x509.ParsePKCS1PrivateKey(decryptedBlock)
 	if err != nil {
-		e := NewRSAPrivateKeyError("failed to parse RSA private Key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to parse RSA private Key", err)
 	}
 	return key, nil
 }
@@ -370,15 +307,10 @@ func ParsePEMPrivateKeyBytes(ctx context.Context, contents []byte, password []by
 // The following errors are returned by this function:
 // RSAPrivateKeyError
 func ParsePEMPrivateKeyFile(ctx context.Context, file string, password []byte) (*rsa.PrivateKey, error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	contents, err := os.ReadFile(file)
 	if err != nil {
-		e := NewRSAPrivateKeyError(fmt.Sprintf("failed to parse RSA private key file '%s'", file), err)
-		e.WithAttr("file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewRSAPrivateKeyErrorWithContext(ctx, fmt.Sprintf("failed to parse RSA private key file '%s'",
+			file), err).WithAttr("file", file)
 	}
 	return ParsePEMPrivateKeyBytes(ctx, contents, password)
 }

@@ -12,7 +12,6 @@ import (
 	"os"
 
 	"go.innotegrity.dev/errorx"
-	"go.innotegrity.dev/slogx"
 )
 
 // CertificatePool stores X509 certificates.
@@ -28,9 +27,6 @@ type CertificatePool struct {
 // The following errors are returned by this function:
 // LoadCertificateError
 func NewCertificatePool(ctx context.Context, emptyPool bool) (*CertificatePool, errorx.Error) {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if emptyPool {
 		return &CertificatePool{
 			CertPool: x509.NewCertPool(),
@@ -39,9 +35,7 @@ func NewCertificatePool(ctx context.Context, emptyPool bool) (*CertificatePool, 
 
 	pool, err := getSystemPool()
 	if err != nil {
-		e := NewLoadCertificateError("failed to get system certificate pool", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, e
+		return nil, NewLoadCertificateErrorWithContext(ctx, "failed to get system certificate pool", err)
 	}
 	return &CertificatePool{
 		CertPool: pool,
@@ -53,23 +47,15 @@ func NewCertificatePool(ctx context.Context, emptyPool bool) (*CertificatePool, 
 // The following errors are returned by this function:
 // LoadCertificateError
 func (p *CertificatePool) AddPEMCertificatesFromFile(ctx context.Context, file string) errorx.Error {
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	contents, err := os.ReadFile(file)
 	if err != nil {
-		e := NewLoadCertificateError(fmt.Sprintf("failed to read certificate file '%s'", file), err)
-		e.WithAttr("certificate_file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewLoadCertificateErrorWithContext(ctx, fmt.Sprintf("failed to read certificate file '%s'", file), err).
+			WithAttr("certificate_file", file)
 	}
 
 	if !p.AppendCertsFromPEM([]byte(contents)) {
-		e := NewLoadCertificateError(fmt.Sprintf("failed to read certificate file '%s'", file),
-			errors.New("one or more PEM certificates werre not parsed"))
-		e.WithAttr("certificate_file", file)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewLoadCertificateErrorWithContext(ctx, fmt.Sprintf("failed to read certificate file '%s'", file),
+			errors.New("one or more PEM certificates werre not parsed")).WithAttr("certificate_file", file)
 	}
 	return nil
 }
@@ -91,13 +77,9 @@ func (p *CertificatePool) AddPEMCertificatesFromFile(ctx context.Context, file s
 func ValidateCertificate(ctx context.Context, cert *x509.Certificate, roots *CertificatePool,
 	intermediates *CertificatePool, keyUsages []x509.ExtKeyUsage, cn string) errorx.Error {
 
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	if cert == nil {
-		e := NewInvalidCertificateError("failed to validate certificate", errors.New("no certificate was provided"))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewInvalidCertificateErrorWithContext(ctx, "failed to validate certificate",
+			errors.New("no certificate was provided"))
 	}
 
 	// verify the certificate chain and usage
@@ -112,17 +94,13 @@ func ValidateCertificate(ctx context.Context, cert *x509.Certificate, roots *Cer
 		verifyOptions.KeyUsages = keyUsages
 	}
 	if _, err := cert.Verify(verifyOptions); err != nil {
-		e := NewInvalidCertificateError("failed to validate certificate", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
+		return NewInvalidCertificateErrorWithContext(ctx, "failed to validate certificate", err)
 	}
 
 	// verify the common name
 	if cn != "" && cert.Subject.CommonName != cn {
-		e := NewInvalidCertificateError("failed to validate certificate",
+		return NewInvalidCertificateErrorWithContext(ctx, "failed to validate certificate",
 			fmt.Errorf("CommonName '%s' does not match expected CN '%s'", cert.Subject.CommonName, cn))
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return e
 	}
 	return nil
 }
@@ -135,15 +113,10 @@ func ValidateCertificate(ctx context.Context, cert *x509.Certificate, roots *Cer
 func NewSelfSignedCertificateKeyPair(ctx context.Context, template *x509.Certificate, keyBits int) (
 	[]byte, []byte, error) {
 
-	logger := slogx.ActiveLoggerFromContext(ctx)
-	errAttr := slogx.ErrorAttrNameFromContext(ctx)
-
 	// generate private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, keyBits)
 	if err != nil {
-		e := NewRSAPrivateKeyError("failed to generate private key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, nil, e
+		return nil, nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to generate private key", err)
 	}
 	publicKey := &privateKey.PublicKey
 	key := new(bytes.Buffer)
@@ -151,27 +124,21 @@ func NewSelfSignedCertificateKeyPair(ctx context.Context, template *x509.Certifi
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}); err != nil {
-		e := NewRSAPrivateKeyError("failed to encode private key", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, nil, e
+		return nil, nil, NewRSAPrivateKeyErrorWithContext(ctx, "failed to encode private key", err)
 	}
 
 	// create a self-signed certificate
 	var parent = template
 	certBytes, err := x509.CreateCertificate(rand.Reader, template, parent, publicKey, privateKey)
 	if err != nil {
-		e := NewX509CertificateError("failed to create X509 certificate", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, nil, e
+		return nil, nil, NewX509CertificateErrorWithContext(ctx, "failed to create X509 certificate", err)
 	}
 	cert := new(bytes.Buffer)
 	if err := pem.Encode(cert, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	}); err != nil {
-		e := NewX509CertificateError("failed to encode X509 certificate", err)
-		logger.Error(e.Msg(), slogx.ErrX(errAttr, e))
-		return nil, nil, e
+		return nil, nil, NewX509CertificateErrorWithContext(ctx, "failed to encode X509 certificate", err)
 	}
 	return cert.Bytes(), key.Bytes(), nil
 }

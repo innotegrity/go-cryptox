@@ -1,6 +1,7 @@
 package cryptox
 
 import (
+	"context"
 	"fmt"
 
 	"go.innotegrity.dev/errorx"
@@ -38,6 +39,15 @@ func newCryptoError(code int, msg string, err error) *cryptoError {
 	}
 }
 
+// newCryptoErrorWithContext creates a new cryptoError error with context.
+func newCryptoErrorWithContext(ctx context.Context, code int, msg string, err error) *cryptoError {
+	count, _ := errorx.AdjustFramesCountByFromContext(ctx)
+	return &cryptoError{
+		BaseError: errorx.NewBaseErrorWithContext(errorx.ContextWithAdjustFramesCountBy(ctx, count+1), code, err),
+		msg:       msg,
+	}
+}
+
 // Error returns the string version of the error.
 func (e *cryptoError) Error() string {
 	if e.InternalError() != nil {
@@ -56,10 +66,17 @@ type DecryptionError struct {
 	*cryptoError
 }
 
-// NewDecryptionError returns a new DecryptionError error.
+// NewDecryptionError creates a new DecryptionError error.
 func NewDecryptionError(msg string, err error) *DecryptionError {
 	return &DecryptionError{
 		cryptoError: newCryptoError(DecryptionErrorCode, msg, err),
+	}
+}
+
+// NewDecryptionErrorWithContext creates a new DecryptionError error with context.
+func NewDecryptionErrorWithContext(ctx context.Context, msg string, err error) *DecryptionError {
+	return &DecryptionError{
+		cryptoError: newCryptoErrorWithContext(ctx, DecryptionErrorCode, msg, err),
 	}
 }
 
@@ -68,10 +85,17 @@ type EncryptionError struct {
 	*cryptoError
 }
 
-// NewEncryptionError returns a new EncryptionError error.
+// NewEncryptionError creates a new EncryptionError error.
 func NewEncryptionError(msg string, err error) *EncryptionError {
 	return &EncryptionError{
 		cryptoError: newCryptoError(EncryptionErrorCode, msg, err),
+	}
+}
+
+// NewEncryptionErrorWithContext creates a new EncryptionError error with context.
+func NewEncryptionErrorWithContext(ctx context.Context, msg string, err error) *EncryptionError {
+	return &EncryptionError{
+		cryptoError: newCryptoErrorWithContext(ctx, EncryptionErrorCode, msg, err),
 	}
 }
 
@@ -80,10 +104,17 @@ type InvalidPublicKeyError struct {
 	*cryptoError
 }
 
-// NewInvalidPublicKeyError returns a new InvalidPublicKeyError error.
+// NewInvalidPublicKeyError creates a new InvalidPublicKeyError error.
 func NewInvalidPublicKeyError(msg string, err error) *InvalidPublicKeyError {
 	return &InvalidPublicKeyError{
 		cryptoError: newCryptoError(InvalidPublicKeyErrorCode, msg, err),
+	}
+}
+
+// NewInvalidPublicKeyErrorWithContext creates a new InvalidPublicKeyError error with context.
+func NewInvalidPublicKeyErrorWithContext(ctx context.Context, msg string, err error) *InvalidPublicKeyError {
+	return &InvalidPublicKeyError{
+		cryptoError: newCryptoErrorWithContext(ctx, InvalidPublicKeyErrorCode, msg, err),
 	}
 }
 
@@ -92,10 +123,17 @@ type SignatureError struct {
 	*cryptoError
 }
 
-// NewSignatureError returns a new SignatureError error.
+// NewSignatureError creates a new SignatureError error.
 func NewSignatureError(msg string, err error) *SignatureError {
 	return &SignatureError{
 		cryptoError: newCryptoError(SignatureErrorCode, msg, err),
+	}
+}
+
+// NewSignatureErrorWithContext creates a new SignatureError error with context.
+func NewSignatureErrorWithContext(ctx context.Context, msg string, err error) *SignatureError {
+	return &SignatureError{
+		cryptoError: newCryptoErrorWithContext(ctx, SignatureErrorCode, msg, err),
 	}
 }
 
@@ -104,10 +142,17 @@ type LoadCertificateError struct {
 	*cryptoError
 }
 
-// NewLoadCertificateError returns a new LoadCertificateError error.
+// NewLoadCertificateError creates a new LoadCertificateError error.
 func NewLoadCertificateError(msg string, err error) *LoadCertificateError {
 	return &LoadCertificateError{
 		cryptoError: newCryptoError(LoadCertificateErrorCode, msg, err),
+	}
+}
+
+// NewLoadCertificateErrorWithContext creates a new LoadCertificateError error with context.
+func NewLoadCertificateErrorWithContext(ctx context.Context, msg string, err error) *LoadCertificateError {
+	return &LoadCertificateError{
+		cryptoError: newCryptoErrorWithContext(ctx, LoadCertificateErrorCode, msg, err),
 	}
 }
 
@@ -116,10 +161,17 @@ type InvalidCertificateError struct {
 	*cryptoError
 }
 
-// NewInvalidCertificateError returns a new InvalidCertificateError error.
+// NewInvalidCertificateError creates a new InvalidCertificateError error.
 func NewInvalidCertificateError(msg string, err error) *InvalidCertificateError {
 	return &InvalidCertificateError{
 		cryptoError: newCryptoError(InvalidCertificateErrorCode, msg, err),
+	}
+}
+
+// NewInvalidCertificateErrorWithContext creates a new InvalidCertificateError error with context.
+func NewInvalidCertificateErrorWithContext(ctx context.Context, msg string, err error) *InvalidCertificateError {
+	return &InvalidCertificateError{
+		cryptoError: newCryptoErrorWithContext(ctx, InvalidCertificateErrorCode, msg, err),
 	}
 }
 
@@ -128,10 +180,17 @@ type RSAPrivateKeyError struct {
 	*cryptoError
 }
 
-// NewRSAPrivateKeyError returns a new RSAPrivateKeyError error.
+// NewRSAPrivateKeyError creates a new RSAPrivateKeyError error.
 func NewRSAPrivateKeyError(msg string, err error) *RSAPrivateKeyError {
 	return &RSAPrivateKeyError{
 		cryptoError: newCryptoError(RSAPrivateKeyErrorCode, msg, err),
+	}
+}
+
+// NewRSAPrivateKeyErrorWithContext creates a new RSAPrivateKeyError error with context.
+func NewRSAPrivateKeyErrorWithContext(ctx context.Context, msg string, err error) *RSAPrivateKeyError {
+	return &RSAPrivateKeyError{
+		cryptoError: newCryptoErrorWithContext(ctx, RSAPrivateKeyErrorCode, msg, err),
 	}
 }
 
@@ -140,10 +199,17 @@ type X509CertificateError struct {
 	*cryptoError
 }
 
-// NewX509CertificateError returns a new X509CertificateError error.
+// NewX509CertificateError creates a new X509CertificateError error.
 func NewX509CertificateError(msg string, err error) *X509CertificateError {
 	return &X509CertificateError{
 		cryptoError: newCryptoError(X509CertificateErrorCode, msg, err),
+	}
+}
+
+// NewX509CertificateErrorWithContext creates a new X509CertificateError error with context.
+func NewX509CertificateErrorWithContext(ctx context.Context, msg string, err error) *X509CertificateError {
+	return &X509CertificateError{
+		cryptoError: newCryptoErrorWithContext(ctx, X509CertificateErrorCode, msg, err),
 	}
 }
 
@@ -152,10 +218,17 @@ type JWTError struct {
 	*cryptoError
 }
 
-// NewJWTError returns a new JWTError error.
+// NewJWTError creates a new JWTError error.
 func NewJWTError(msg string, err error) *JWTError {
 	return &JWTError{
 		cryptoError: newCryptoError(JWTErrorCode, msg, err),
+	}
+}
+
+// NewJWTErrorWithContext creates a new JWTError error with context.
+func NewJWTErrorWithContext(ctx context.Context, msg string, err error) *JWTError {
+	return &JWTError{
+		cryptoError: newCryptoErrorWithContext(ctx, JWTErrorCode, msg, err),
 	}
 }
 
@@ -164,10 +237,17 @@ type PGPError struct {
 	*cryptoError
 }
 
-// NewPGPError returns a new PGPError error.
+// NewPGPError creates a new PGPError error.
 func NewPGPError(msg string, err error) *PGPError {
 	return &PGPError{
 		cryptoError: newCryptoError(PGPErrorCode, msg, err),
+	}
+}
+
+// NewPGPErrorWithContext creates a new PGPError error with context.
+func NewPGPErrorWithContext(ctx context.Context, msg string, err error) *PGPError {
+	return &PGPError{
+		cryptoError: newCryptoErrorWithContext(ctx, PGPErrorCode, msg, err),
 	}
 }
 
@@ -176,9 +256,16 @@ type PEMGeneralError struct {
 	*cryptoError
 }
 
-// NewPEMGeneralError returns a new PEMGeneralError error.
+// NewPEMGeneralError creates a new PEMGeneralError error.
 func NewPEMGeneralError(msg string, err error) *PEMGeneralError {
 	return &PEMGeneralError{
 		cryptoError: newCryptoError(PEMGeneralErrorCode, msg, err),
+	}
+}
+
+// NewPEMGeneralErrorWithContext creates a new PEMGeneralError error with context.
+func NewPEMGeneralErrorWithContext(ctx context.Context, msg string, err error) *PEMGeneralError {
+	return &PEMGeneralError{
+		cryptoError: newCryptoErrorWithContext(ctx, PEMGeneralErrorCode, msg, err),
 	}
 }
