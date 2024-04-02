@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/ProtonMail/gopenpgp/v2 v2.7.4
 	github.com/golang-jwt/jwt/v5 v5.2.0
-	go.innotegrity.dev/errorx v1.1.3
+	go.innotegrity.dev/errorx v1.1.5
 )
 
 require (
